@@ -1,0 +1,119 @@
+index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MF Quick Triage</title>
+<style>
+  :root{--bg:#0f172a;--fg:#e5e7eb;--muted:#94a3b8;--card:#111827;--line:#1f2937;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  header{padding:16px;position:sticky;top:0;background:#0f172a}
+  h1{margin:0;font-size:1.2rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px}
+  label{display:block;margin-bottom:4px;font-size:.9rem;color:#cbd5e1}
+  input{width:100%;padding:10px;border-radius:8px;border:1px solid #2a3548;background:#0b1220;color:var(--fg);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .full{grid-column:1/-1}
+  .btn{padding:12px;width:100%;border-radius:10px;margin-top:8px;font-weight:bold}
+  .btn-primary{background:#2563eb;color:white;border:none}
+  .kpi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .k{background:#0b1220;padding:10px;border-radius:10px}
+  .kv{font-size:1.1rem;font-weight:700}
+  .badge{display:inline-block;margin-top:10px;padding:8px 12px;border-radius:999px}
+  .ok{background:#052e1a;color:#86efac}
+  .mid{background:#2a1b00;color:#fbbf24}
+  .no{background:#2f0a0a;color:#fca5a5}
+</style>
+</head>
+<body>
+  <header>
+    <h1>🏢 MF Quick Triage</h1>
+  </header>
+
+  <div class="card">
+    <p><b>Install to Home Screen</b></p>
+    <ol>
+      <li><b>iPhone (Safari):</b> Share → Add to Home Screen → Add.</li>
+      <li><b>Android (Chrome):</b> Menu ⋮ → Add to Home screen → Add.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div><label>Units</label><input id="units" type="number"></div>
+      <div><label>Price ($)</label><input id="price" type="number"></div>
+      <div><label>Avg Rent ($/mo)</label><input id="rent" type="number"></div>
+      <div><label>Other Inc ($/mo/unit)</label><input id="other" type="number"></div>
+      <div><label>Occupancy (%)</label><input id="occ" type="number"></div>
+      <div><label>Expense Ratio (%)</label><input id="exr" type="number"></div>
+      <div><label>LTV (%)</label><input id="ltv" type="number"></div>
+      <div><label>Rate (%)</label><input id="rate" type="number"></div>
+      <div><label>Amort (yrs)</label><input id="amort" type="number"></div>
+      <div><label>IO yrs</label><input id="io" type="number"></div>
+      <div class="full"><label>Notes</label><input id="notes"></div>
+    </div>
+    <button class="btn btn-primary" onclick="calc()">Calculate</button>
+  </div>
+
+  <div class="card">
+    <b>Results</b>
+    <div class="kpi">
+      <div class="k"><div>NOI</div><div id="noi" class="kv">$0</div></div>
+      <div class="k"><div>Cap Rate</div><div id="cap" class="kv">0%</div></div>
+      <div class="k"><div>Debt Service</div><div id="debt" class="kv">$0</div></div>
+      <div class="k"><div>DSCR</div><div id="dscr" class="kv">0</div></div>
+      <div class="k"><div>CoC</div><div id="coc" class="kv">0%</div></div>
+      <div class="k"><div>Spread</div><div id="spread" class="kv">0 bps</div></div>
+    </div>
+    <div id="verdict" class="badge">Enter inputs</div>
+  </div>
+
+<script>
+function toNum(v){const n=parseFloat(v);return isNaN(n)?0:n;}
+function usd(n){return isFinite(n)?n.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:0}):'$0';}
+function calc(){
+  const units=toNum(document.getElementById('units').value);
+  const price=toNum(document.getElementById('price').value);
+  const rent=toNum(document.getElementById('rent').value);
+  const other=toNum(document.getElementById('other').value);
+  const occ=toNum(document.getElementById('occ').value)/100;
+  const exr=toNum(document.getElementById('exr').value)/100;
+  const ltv=toNum(document.getElementById('ltv').value)/100;
+  const rate=toNum(document.getElementById('rate').value)/100;
+  const amort=Math.max(1,toNum(document.getElementById('amort').value));
+  const io=Math.max(0,toNum(document.getElementById('io').value));
+
+  const gpr=units*(rent+other)*12;
+  const egi=gpr*occ;
+  const expenses=egi*exr;
+  const noi=egi-expenses;
+
+  const loan=price*ltv;
+  const monthly=rate/12;
+  const n=amort*12;
+  const pmt=(monthly===0)?loan/n:(loan*monthly)/(1-Math.pow(1+monthly,-n));
+  const annualDebt=(io>0)?loan*rate:pmt*12;
+
+  const cap=price>0?noi/price:0;
+  const dscr=annualDebt>0?noi/annualDebt:0;
+  const equity=Math.max(0,price-loan);
+  const coc=equity>0?(noi-annualDebt)/equity:0;
+  const spreadBps=(cap-rate)*10000;
+
+  document.getElementById('noi').textContent=usd(noi);
+  document.getElementById('cap').textContent=(cap*100).toFixed(2)+'%';
+  document.getElementById('debt').textContent=usd(annualDebt);
+  document.getElementById('dscr').textContent=dscr.toFixed(2);
+  document.getElementById('coc').textContent=(coc*100).toFixed(2)+'%';
+  document.getElementById('spread').textContent=Math.round(spreadBps)+' bps';
+
+  const v=document.getElementById('verdict');
+  if(dscr>=1.25&&coc>=0.07&&spreadBps>=75){v.textContent="✅ Green Light";v.className="badge ok";}
+  else if(dscr>=1.0){v.textContent="⚠️ Maybe";v.className="badge mid";}
+  else{v.textContent="❌ Red Flag";v.className="badge no";}
+}
+</script>
+</body>
+</html>
